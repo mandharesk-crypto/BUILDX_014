@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>EmergencyLink | Patient & Family Live Route Tracker</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Plus Jakarta Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+            },
+            emergency: {
+              50: '#fef2f2',
+              100: '#fee2e2',
+              500: '#ef4444',
+              600: '#dc2626',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom clean glassmorphism and subtle animations */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    
+    .pulse-ring {
+      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+      animation: pulse-red 2s infinite cubic-bezier(0.66, 0, 0, 1);
+    }
+
+    @keyframes pulse-red {
+      to {
+        box-shadow: 0 0 0 16px rgba(239, 68, 68, 0);
+      }
+    }
+
+    .pulse-green {
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      animation: pulse-teal 2s infinite cubic-bezier(0.66, 0, 0, 1);
+    }
+
+    @keyframes pulse-teal {
+      to {
+        box-shadow: 0 0 0 14px rgba(16, 185, 129, 0);
+      }
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-800 antialiased font-sans min-h-screen flex items-center justify-center p-0 sm:p-4 selection:bg-brand-500 selection:text-white">
+
+  <!-- Desktop Presentation Outer Container -->
+  <div class="w-full max-w-md h-[100dvh] sm:h-[900px] sm:max-h-[95vh] bg-white sm:rounded-[40px] shadow-2xl overflow-hidden flex flex-col relative border border-slate-100 sm:border-slate-800">
+    
+    <!-- Top Mobile Frame Status / Emergency Alert Header -->
+    <header class="bg-slate-900 text-white px-5 pt-4 pb-3 flex flex-col gap-2 shrink-0 z-20 border-b border-slate-800">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/30">
+            <i data-lucide="activity" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h1 class="font-display font-bold text-sm tracking-tight text-white flex items-center gap-1.5">
+              EmergencyLink
+              <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">LIVE V3.2</span>
+            </h1>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Audio Siren / Chime Toggle -->
+          <button id="soundToggleBtn" onclick="toggleAudio()" class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 transition" title="Toggle Alert Chime">
+            <i data-lucide="volume-2" id="soundIcon" class="w-4 h-4"></i>
+          </button>
+          
+          <!-- Bilingual Switcher -->
+          <button onclick="toggleLang()" class="px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 transition">
+            <span id="langBtnLabel">हिन्दी</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Critical Ticker Banner -->
+      <div class="flex items-center justify-between bg-red-950/60 border border-red-500/30 rounded-xl px-3 py-2 mt-1">
+        <div class="flex items-center gap-2 overflow-hidden">
+          <span class="w-2.5 h-2.5 rounded-full bg-red-500 pulse-ring shrink-0"></span>
+          <p class="text-xs text-red-200 truncate font-medium">
+            <span class="font-bold text-red-100" id="caseIdLabel">CASE #EM-902:</span> 
+            <span id="caseShortDesc">Critical Trauma • ICU Reserved</span>
+          </p>
+        </div>
+        <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/40 shrink-0 font-bold">
+          HIGH PRIORITY
+        </span>
+      </div>
+    </header>
+
+    <!-- Main Scrollable Body -->
+    <main class="flex-1 overflow-y-auto flex flex-col relative bg-slate-50">
+
+      <!-- 1. Real-Time Interactive Canvas GPS Tracker -->
+      <div class="relative w-full h-72 bg-slate-950 shrink-0 overflow-hidden shadow-inner">
+        <!-- HTML5 Canvas for live smooth car motion, route pulse, and hospital icon -->
+        <canvas id="gpsCanvas" class="w-full h-full block"></canvas>
+
+        <!-- Floating Quick Telemetry Overlay -->
+        <div class="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
+          <div class="glass-card shadow-lg border border-slate-200/80 rounded-2xl px-3.5 py-2 flex items-center gap-3">
+            <div class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></div>
+            <div>
+              <p class="text-[10px] font-semibold text-slate-500 tracking-wider uppercase" id="etaTitle">ESTIMATED ARRIVAL</p>
+              <div class="flex items-baseline gap-1">
+                <span class="font-display font-extrabold text-2xl text-slate-900 tracking-tight" id="etaCountdown">05:42</span>
+                <span class="text-xs font-bold text-emerald-600">MIN</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="glass-card shadow-lg border border-slate-200/80 rounded-2xl px-3 py-2 text-right">
+            <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider" id="speedDistTitle">SPEED & DISTANCE</p>
+            <p class="text-xs font-bold font-mono text-slate-800">
+              <span id="speedValue">54</span> km/h • <span id="distValue">1.8</span> km
+            </p>
+          </div>
+        </div>
+
+        <!-- Canvas Controls -->
+        <div class="absolute bottom-3 right-3 flex flex-col gap-2">
+          <button onclick="recenterMap()" class="w-8 h-8 rounded-xl bg-white shadow-md border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition" title="Recenter Ambulance">
+            <i data-lucide="crosshair" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- Green Corridor Safe Route Badge -->
+        <div class="absolute bottom-3 left-3">
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 text-[11px] font-medium backdrop-blur-md">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span id="corridorLabel">Green Corridor Active</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- 2. Patient On-Board Vitals Stream (Assures Family Members) -->
+      <section class="px-4 py-3 bg-white border-b border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <i data-lucide="heart-pulse" class="w-3.5 h-3.5 text-rose-500"></i>
+            <span id="vitalsStreamTitle">Paramedic In-Transit Vitals</span>
+          </h2>
+          <span class="text-[10px] font-mono text-emerald-600 flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span id="telemetrySyncedLabel">Syncing Live</span>
+          </span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 text-center">
+          <div class="bg-rose-50 border border-rose-100 rounded-xl p-2 transition hover:bg-rose-100/60">
+            <span class="text-[10px] text-rose-600 font-semibold block uppercase">Heart Rate</span>
+            <span class="text-base font-extrabold text-slate-900 font-mono" id="heartRate">98</span>
+            <span class="text-[10px] text-slate-500 font-medium">BPM</span>
+          </div>
+
+          <div class="bg-sky-50 border border-sky-100 rounded-xl p-2 transition hover:bg-sky-100/60">
+            <span class="text-[10px] text-sky-600 font-semibold block uppercase">SpO2 Oxygen</span>
+            <span class="text-base font-extrabold text-slate-900 font-mono" id="oxygenRate">97</span>
+            <span class="text-[10px] text-slate-500 font-medium">%</span>
+          </div>
+
+          <div class="bg-amber-50 border border-amber-100 rounded-xl p-2 transition hover:bg-amber-100/60">
+            <span class="text-[10px] text-amber-700 font-semibold block uppercase">Blood Pressure</span>
+            <span class="text-base font-extrabold text-slate-900 font-mono" id="bpValue">120/78</span>
+            <span class="text-[10px] text-slate-500 font-medium">mmHg</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Target Destination Hospital Resource Card (The Main USP) -->
+      <section class="p-4">
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/90 relative overflow-hidden">
+          <div class="absolute -top-6 -right-6 w-24 h-24 bg-emerald-50 rounded-full blur-xl pointer-events-none"></div>
+
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="inline-block px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold tracking-wide uppercase mb-1" id="hospitalBadge">
+                Confirmed Destination
+              </span>
+              <h3 class="font-display font-bold text-base text-slate-900 leading-snug" id="hospName">
+                Apex Super Specialty Hospital
+              </h3>
+              <p class="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-400"></i>
+                <span id="hospAddress">Ramdaspeth, Nagpur • Trauma Wing B</span>
+              </p>
+            </div>
+            
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0">
+              <i data-lucide="building-2" class="w-5 h-5"></i>
+            </div>
+          </div>
+
+          <!-- Confirmed Medical Preparation Readiness -->
+          <div class="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
+            <div class="flex items-center gap-2">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0"></i>
+              <span class="text-slate-600 font-medium" id="icuStatusText">ICU Bed #04 Reserved</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0"></i>
+              <span class="text-slate-600 font-medium" id="docStatusText">Neuro Team on Standby</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0"></i>
+              <span class="text-slate-600 font-medium" id="bloodStatusText">O- Blood Units Prepared</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0"></i>
+              <span class="text-slate-600 font-medium" id="triageStatusText">ER Intake Pre-cleared</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Step-by-Step Live Journey Timeline -->
+      <section class="px-4 pb-4">
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/90">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3" id="timelineTitle">
+            Journey Status & Timeline
+          </h2>
+
+          <div class="space-y-4 relative before:absolute before:inset-0 before:left-3 before:w-0.5 before:bg-slate-200 before:top-2 before:bottom-2">
+            
+            <!-- Step 1: Completed -->
+            <div class="flex items-start gap-3 relative">
+              <div class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 z-10 shadow-sm">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-baseline justify-between">
+                  <h4 class="text-xs font-bold text-slate-900" id="step1Title">SOS Initiated & Paramedic Dispatched</h4>
+                  <span class="text-[10px] text-slate-400 font-mono">11:42 AM</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-0.5" id="step1Desc">Nearest Advanced Life Support Unit (ALS-104) deployed.</p>
+              </div>
+            </div>
+
+            <!-- Step 2: Completed -->
+            <div class="flex items-start gap-3 relative">
+              <div class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 z-10 shadow-sm">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-baseline justify-between">
+                  <h4 class="text-xs font-bold text-slate-900" id="step2Title">Patient Stabilized & Boarded</h4>
+                  <span class="text-[10px] text-slate-400 font-mono">11:49 AM</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-0.5" id="step2Desc">Pickup from Dharampeth completed. Continuous ECG initiated.</p>
+              </div>
+            </div>
+
+            <!-- Step 3: ACTIVE -->
+            <div class="flex items-start gap-3 relative">
+              <div class="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 z-10 pulse-green">
+                <i data-lucide="navigation" class="w-3 h-3 animate-spin"></i>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-baseline justify-between">
+                  <h4 class="text-xs font-bold text-emerald-800" id="step3Title">En Route to Apex Super Specialty</h4>
+                  <span class="text-[10px] font-bold text-emerald-700 font-mono animate-pulse">CURRENT</span>
+                </div>
+                <p class="text-[11px] text-slate-600 mt-0.5" id="step3Desc">Traversing Wardha Road under prioritized signal corridor.</p>
+              </div>
+            </div>
+
+            <!-- Step 4: Pending -->
+            <div class="flex items-start gap-3 relative opacity-60">
+              <div class="w-6 h-6 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center shrink-0 z-10">
+                <i data-lucide="hospital" class="w-3 h-3"></i>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-baseline justify-between">
+                  <h4 class="text-xs font-bold text-slate-800" id="step4Title">Arrival & Direct ICU Handover</h4>
+                  <span class="text-[10px] text-slate-400 font-mono">ETA 11:58 AM</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-0.5" id="step4Desc">Dedicated trauma dock #2 cleared for zero-delay admission.</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. Assigned Paramedic Crew Details -->
+      <section class="px-4 pb-4">
+        <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200/90 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 font-bold text-sm">
+              <i data-lucide="user-check" class="w-5 h-5 text-slate-600"></i>
+            </div>
+            <div>
+              <p class="text-[10px] text-slate-400 font-bold uppercase" id="paramedicRoleLabel">Lead Paramedic</p>
+              <h4 class="text-xs font-bold text-slate-900" id="paramedicName">Capt. Rajesh Verma</h4>
+              <p class="text-[11px] text-emerald-600 font-medium">Ambulance #ALS-104</p>
+            </div>
+          </div>
+          
+          <button onclick="triggerCall('paramedic')" class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 flex items-center justify-center transition active:scale-95">
+            <i data-lucide="phone-forwarded" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Fixed Bottom Emergency Touch Actions (Big, Thumb-Friendly) -->
+    <footer class="bg-white border-t border-slate-200 px-4 py-3 shrink-0 z-20 shadow-lg">
+      <div class="grid grid-cols-2 gap-3">
+        <!-- Call Hospital Emergency Desk -->
+        <button onclick="triggerCall('hospital')" class="flex items-center justify-center gap-2 py-3 px-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition active:scale-[0.98] shadow-sm">
+          <i data-lucide="phone-call" class="w-4 h-4 text-emerald-400"></i>
+          <span id="callErBtn">Call Hospital ER</span>
+        </button>
+
+        <!-- Live Location Share with Family (WhatsApp / SMS) -->
+        <button onclick="shareTrackingLink()" class="flex items-center justify-center gap-2 py-3 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition active:scale-[0.98] shadow-sm shadow-emerald-500/20">
+          <i data-lucide="share-2" class="w-4 h-4 text-emerald-100"></i>
+          <span id="shareBtn">Share with Family</span>
+        </button>
+      </div>
+    </footer>
+
+    <!-- Interactive Simulated Call Modal -->
+    <div id="callModal" class="hidden absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex flex-col justify-end p-4 transition-all">
+      <div class="bg-white rounded-3xl p-5 shadow-2xl border border-slate-100 animate-in slide-in-from-bottom duration-200">
+        <div class="text-center py-2">
+          <div class="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3 animate-pulse">
+            <i data-lucide="phone-outgoing" class="w-6 h-6"></i>
+          </div>
+          <p class="text-xs text-slate-400 font-bold uppercase tracking-wider" id="modalCallType">Direct Emergency Line</p>
+          <h3 class="font-display font-bold text-lg text-slate-900 mt-1" id="modalTargetName">Apex ER Duty In-charge</h3>
+          <p class="text-xs text-slate-500 font-mono mt-1" id="modalCallTimer">Connecting to Priority Hotline...</p>
+        </div>
+
+        <div class="mt-6 flex items-center gap-3">
+          <button onclick="closeCallModal()" class="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95">
+            <i data-lucide="phone-off" class="w-4 h-4"></i>
+            <span id="endCallBtnLabel">Disconnect Call</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification for Share / Copy -->
+    <div id="toastMessage" class="hidden absolute top-20 left-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 text-xs font-medium border border-slate-700 transition">
+      <i data-lucide="copy-check" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+      <span id="toastText">Emergency live tracking link copied to clipboard!</span>
+    </div>
+
+  </div>
+
+  <!-- JavaScript Logic: Canvas GPS Simulation, Telemetry, Audio, and Bilingual Support -->
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // Multilingual Dictionary (English & Hindi)
+    const translations = {
+      en: {
+        langBtnLabel: 'हिन्दी',
+        caseId: 'CASE #EM-902:',
+        caseDesc: 'Critical Trauma • ICU Reserved',
+        etaTitle: 'ESTIMATED ARRIVAL',
+        speedDist: 'SPEED & DISTANCE',
+        corridor: 'Green Corridor Active',
+        vitalsTitle: 'Paramedic In-Transit Vitals',
+        syncing: 'Syncing Live',
+        hospBadge: 'Confirmed Destination',
+        hospName: 'Apex Super Specialty Hospital',
+        hospAddr: 'Ramdaspeth, Nagpur • Trauma Wing B',
+        icuReady: 'ICU Bed #04 Reserved',
+        docReady: 'Neuro Team on Standby',
+        bloodReady: 'O- Blood Units Prepared',
+        triageReady: 'ER Intake Pre-cleared',
+        timelineTitle: 'Journey Status & Timeline',
+        step1T: 'SOS Initiated & Paramedic Dispatched',
+        step1D: 'Nearest Advanced Life Support Unit (ALS-104) deployed.',
+        step2T: 'Patient Stabilized & Boarded',
+        step2D: 'Pickup from Dharampeth completed. Continuous ECG initiated.',
+        step3T: 'En Route to Apex Super Specialty',
+        step3D: 'Traversing Wardha Road under prioritized signal corridor.',
+        step4T: 'Arrival & Direct ICU Handover',
+        step4D: 'Dedicated trauma dock #2 cleared for zero-delay admission.',
+        callEr: 'Call Hospital ER',
+        share: 'Share with Family',
+        endCall: 'Disconnect Call',
+        copied: 'Emergency tracking link copied for family sharing!'
+      },
+      hi: {
+        langBtnLabel: 'English',
+        caseId: 'केस #EM-902:',
+        caseDesc: 'गंभीर स्थिति • ICU बेड आरक्षित',
+        etaTitle: 'पहुंचने का अनुमानित समय',
+        speedDist: 'गति और दूरी',
+        corridor: 'ग्रीन कॉरिडोर चालू है',
+        vitalsTitle: 'पैरामेडिक द्वारा लाइव जांच (वाइटल्स)',
+        syncing: 'लाइव अपडेट जारी',
+        hospBadge: 'स्वीकृत अस्पताल',
+        hospName: 'एपेक्स सुपर स्पेशलिटी हॉस्पिटल',
+        hospAddr: 'रामदासपेठ, नागपुर • ट्रॉमा विंग B',
+        icuReady: 'ICU बेड #04 आरक्षित',
+        docReady: 'न्यूरोसर्जन टीम तैयार',
+        bloodReady: 'O- ब्लड यूनिट्स तैयार',
+        triageReady: 'आपातकालीन कक्ष पूर्णतः तैयार',
+        timelineTitle: 'सफ़र की वर्तमान स्थिति',
+        step1T: 'आपातकालीन सूचना व एम्बुलेंस रवाना',
+        step1D: 'निकटतम जीवन रक्षक एम्बुलेंस (ALS-104) रवाना हुई।',
+        step2T: 'मरीज़ को स्थिर कर बोर्ड किया गया',
+        step2D: 'धरमपेठ से पिकअप पूरा। निरंतर ईसीजी शुरू।',
+        step3T: 'एपेक्स सुपर स्पेशलिटी की ओर अग्रसर',
+        step3D: 'वर्धा रोड पर ट्रैफिक क्लीयरेंस के साथ यात्रा जारी।',
+        step4T: 'अस्पताल आगमन व सीधा ICU प्रवेश',
+        step4D: 'बिना किसी देरी के प्रवेश हेतु डॉक #2 आरक्षित।',
+        callEr: 'अस्पताल ER को कॉल करें',
+        share: 'परिवार को साझा करें',
+        endCall: 'कॉल समाप्त करें',
+        copied: 'लाइव ट्रैकिंग लिंक कॉपी कर दिया गया है!'
+      }
+    };
+
+    let currentLang = 'en';
+
+    function toggleLang() {
+      currentLang = currentLang === 'en' ? 'hi' : 'en';
+      const t = translations[currentLang];
+
+      document.getElementById('langBtnLabel').innerText = t.langBtnLabel;
+      document.getElementById('caseIdLabel').innerText = t.caseId;
+      document.getElementById('caseShortDesc').innerText = t.caseDesc;
+      document.getElementById('etaTitle').innerText = t.etaTitle;
+      document.getElementById('speedDistTitle').innerText = t.speedDist;
+      document.getElementById('corridorLabel').innerText = t.corridor;
+      document.getElementById('vitalsStreamTitle').innerText = t.vitalsTitle;
+      document.getElementById('telemetrySyncedLabel').innerText = t.syncing;
+      document.getElementById('hospitalBadge').innerText = t.hospBadge;
+      document.getElementById('hospName').innerText = t.hospName;
+      document.getElementById('hospAddress').innerText = t.hospAddr;
+      document.getElementById('icuStatusText').innerText = t.icuReady;
+      document.getElementById('docStatusText').innerText = t.docReady;
+      document.getElementById('bloodStatusText').innerText = t.bloodReady;
+      document.getElementById('triageStatusText').innerText = t.triageReady;
+      document.getElementById('timelineTitle').innerText = t.timelineTitle;
+      document.getElementById('step1Title').innerText = t.step1T;
+      document.getElementById('step1Desc').innerText = t.step1D;
+      document.getElementById('step2Title').innerText = t.step2T;
+      document.getElementById('step2Desc').innerText = t.step2D;
+      document.getElementById('step3Title').innerText = t.step3T;
+      document.getElementById('step3Desc').innerText = t.step3D;
+      document.getElementById('step4Title').innerText = t.step4T;
+      document.getElementById('step4Desc').innerText = t.step4D;
+      document.getElementById('callErBtn').innerText = t.callEr;
+      document.getElementById('shareBtn').innerText = t.share;
+      document.getElementById('endCallBtnLabel').innerText = t.endCall;
+    }
+
+    // Audio Chime / Beep Synthesizer (Web Audio API)
+    let audioCtx = null;
+    let isSoundOn = false;
+
+    function toggleAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      isSoundOn = !isSoundOn;
+      const icon = document.getElementById('soundIcon');
+      if (isSoundOn) {
+        icon.setAttribute('data-lucide', 'volume-2');
+        playHeartbeatBeep(580, 0.08);
+      } else {
+        icon.setAttribute('data-lucide', 'volume-x');
+      }
+      lucide.createIcons();
+    }
+
+    function playHeartbeatBeep(freq = 600, duration = 0.06) {
+      if (!isSoundOn || !audioCtx) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // -------------------------------------------------------------
+    // Live Smooth GPS Canvas Rendering Engine
+    // -------------------------------------------------------------
+    const canvas = document.getElementById('gpsCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Route coordinates (Simulating city path in Nagpur from Dharampeth to Ramdaspeth)
+    const waypoints = [
+      { x: 0.15, y: 0.80 },
+      { x: 0.30, y: 0.65 },
+      { x: 0.45, y: 0.65 },
+      { x: 0.60, y: 0.40 },
+      { x: 0.78, y: 0.28 },
+      { x: 0.88, y: 0.22 }
+    ];
+
+    let progress = 0.42; // Starts mid-route for demonstration
+    let pulseAngle = 0;
+
+    function drawMap() {
+      const w = canvas.width;
+      const h = canvas.height;
+
+      // Dark tactical road styling
+      ctx.fillStyle = '#090d16';
+      ctx.fillRect(0, 0, w, h);
+
+      // Draw secondary road grid
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1.5;
+      for (let x = 20; x < w; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+      for (let y = 20; y < h; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+
+      // Draw Main Highway / Route
+      ctx.beginPath();
+      waypoints.forEach((pt, idx) => {
+        const px = pt.x * w;
+        const py = pt.y * h;
+        if (idx === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 8;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      // Green Corridor Active Glowing Line
+      ctx.beginPath();
+      waypoints.forEach((pt, idx) => {
+        const px = pt.x * w;
+        const py = pt.y * h;
+        if (idx === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 3.5;
+      ctx.shadowColor = '#10b981';
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+      ctx.shadowBlur = 0; // reset
+
+      // Draw Start Pickup Point (Dharampeth)
+      const startX = waypoints[0].x * w;
+      const startY = waypoints[0].y * h;
+      ctx.fillStyle = '#64748b';
+      ctx.beginPath();
+      ctx.arc(startX, startY, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw Target Hospital Landmark (Ramdaspeth)
+      const targetX = waypoints[waypoints.length - 1].x * w;
+      const targetY = waypoints[waypoints.length - 1].y * h;
+      
+      // Hospital Pulse Beacon
+      ctx.beginPath();
+      ctx.arc(targetX, targetY, 12 + Math.sin(pulseAngle) * 4, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+      ctx.fill();
+
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.arc(targetX, targetY, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Red cross inside target hospital marker
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('+', targetX, targetY);
+
+      // Current Ambulance Interpolated Position
+      const currentPos = getInterpolatedPoint(progress, w, h);
+      
+      // Pulsing wave behind vehicle
+      ctx.beginPath();
+      ctx.arc(currentPos.x, currentPos.y, 16 + Math.sin(pulseAngle * 1.5) * 5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
+      ctx.fill();
+
+      // Ambulance Icon Circle
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(currentPos.x, currentPos.y, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Directional arrow
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(currentPos.x, currentPos.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Advance progress slowly
+      progress += 0.00035;
+      if (progress >= 0.98) progress = 0.2; // loop for continuous demo
+
+      pulseAngle += 0.05;
+      requestAnimationFrame(drawMap);
+    }
+
+    function getInterpolatedPoint(t, w, h) {
+      const numSegments = waypoints.length - 1;
+      const scaledT = t * numSegments;
+      const index = Math.min(Math.floor(scaledT), numSegments - 1);
+      const subT = scaledT - index;
+
+      const p0 = waypoints[index];
+      const p1 = waypoints[index + 1];
+
+      return {
+        x: (p0.x + (p1.x - p0.x) * subT) * w,
+        y: (p0.y + (p1.y - p0.y) * subT) * h
+      };
+    }
+
+    function recenterMap() {
+      progress = 0.45;
+    }
+
+    // Start Animation
+    requestAnimationFrame(drawMap);
+
+    // -------------------------------------------------------------
+    // Live Telemetry Countdown & Vitals Real-Time Flutter Simulation
+    // -------------------------------------------------------------
+    let totalSecondsRemaining = 342; // 05:42
+
+    setInterval(() => {
+      // Countdown Timer
+      if (totalSecondsRemaining > 60) {
+        totalSecondsRemaining--;
+        const mins = Math.floor(totalSecondsRemaining / 60);
+        const secs = totalSecondsRemaining % 60;
+        document.getElementById('etaCountdown').innerText = 
+          `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        
+        // Realistic micro-fluctuations in remaining distance and speed
+        const distKm = (totalSecondsRemaining * 0.0053).toFixed(1);
+        document.getElementById('distValue').innerText = distKm;
+      }
+
+      // Realistic Vitals Flutter
+      const hr = 96 + Math.floor(Math.random() * 5);
+      const spo2 = 96 + Math.floor(Math.random() * 3);
+      const speed = 52 + Math.floor(Math.random() * 6);
+
+      document.getElementById('heartRate').innerText = hr;
+      document.getElementById('oxygenRate').innerText = spo2;
+      document.getElementById('speedValue').innerText = speed;
+
+      // Subtle heartbeat sound effect if unmuted
+      if (Math.random() > 0.6) {
+        playHeartbeatBeep(580, 0.05);
+      }
+    }, 1000);
+
+    // -------------------------------------------------------------
+    // Interactive Handlers (ER Call simulation, Share Dialogs)
+    // -------------------------------------------------------------
+    let callTimerInterval = null;
+
+    function triggerCall(target) {
+      const modal = document.getElementById('callModal');
+      const targetTitle = document.getElementById('modalTargetName');
+      const callTimer = document.getElementById('modalCallTimer');
+
+      if (target === 'hospital') {
+        targetTitle.innerText = "Apex Trauma Control Desk";
+      } else {
+        targetTitle.innerText = "Capt. Rajesh (Ambulance Lead)";
+      }
+
+      modal.classList.remove('hidden');
+      let sec = 0;
+      callTimer.innerText = "Connecting secure channel...";
+      
+      callTimerInterval = setInterval(() => {
+        sec++;
+        callTimer.innerText = `Call Active • 00:${sec < 10 ? '0' + sec : sec}`;
+      }, 1000);
+
+      playHeartbeatBeep(440, 0.15);
+    }
+
+    function closeCallModal() {
+      const modal = document.getElementById('callModal');
+      modal.classList.add('hidden');
+      if (callTimerInterval) clearInterval(callTimerInterval);
+    }
+
+    function shareTrackingLink() {
+      const shareUrl = "https://emergencylink.app/track/EM-902";
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          showToast(translations[currentLang].copied);
+        }).catch(() => {
+          showToast("Link: " + shareUrl);
+        });
+      } else {
+        showToast("Link: " + shareUrl);
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toastMessage');
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3500);
+    }
+  </script>
+</body>
+</html>
