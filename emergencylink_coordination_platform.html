@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmergencyLink / MediRoute - Smart Emergency Resource Coordination</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#10b981',
+              600: '#059669',
+              900: '#064e3b',
+            },
+            erRed: {
+              500: '#ef4444',
+              600: '#dc2626',
+              900: '#7f1d1d'
+            },
+            erAmber: '#f59e0b',
+            hudBg: '#0b0f19',
+            hudCard: '#111827',
+            hudBorder: '#1f2937'
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'monospace']
+          },
+          animation: {
+            'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'ping-slow': 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite',
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #080c14;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0d1322;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #25334e;
+      border-radius: 4px;
+    }
+    .glow-red {
+      box-shadow: 0 0 20px -3px rgba(239, 68, 68, 0.4);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 20px -3px rgba(16, 185, 129, 0.35);
+    }
+    .glow-cyan {
+      box-shadow: 0 0 20px -3px rgba(6, 182, 212, 0.35);
+    }
+    .map-grid {
+      background-size: 28px 28px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#070b13] text-slate-200">
+
+  <header class="border-b border-slate-800 bg-[#0d1322]/90 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <!-- Brand Logo -->
+      <div class="flex items-center space-x-3">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-rose-600 to-red-500 flex items-center justify-center text-white shadow-lg shadow-rose-900/50">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="text-xl font-bold tracking-tight text-white font-mono">Emergency<span class="text-rose-500">Link</span></span>
+            <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-full uppercase">Demo Mode</span>
+          </div>
+          <p class="text-[11px] text-slate-400 hidden sm:block">Nagpur Metropolitan Regional Trauma & Resource Grid</p>
+        </div>
+      </div>
+
+      <!-- Quick Preset Buttons for Judges -->
+      <div class="hidden lg:flex items-center space-x-2 bg-slate-900/90 border border-slate-800 rounded-lg p-1.5">
+        <span class="text-xs text-slate-400 px-2 font-mono flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span> Presets:
+        </span>
+        <button onclick="loadPreset('neuro')" class="text-xs px-2.5 py-1 rounded bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-800/60 transition-all font-medium">
+          🔴 Head Trauma (Neuro + ICU)
+        </button>
+        <button onclick="loadPreset('cardiac')" class="text-xs px-2.5 py-1 rounded bg-amber-950/70 hover:bg-amber-900 text-amber-300 border border-amber-800/60 transition-all font-medium">
+          🟠 Cardiac Arrest (Cath Lab)
+        </button>
+        <button onclick="loadPreset('ortho')" class="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all font-medium">
+          🟡 Limb Fracture (Moderate)
+        </button>
+      </div>
+
+      <!-- Top Audio Alert & Sound toggle -->
+      <div class="flex items-center space-x-3">
+        <button id="soundToggleBtn" onclick="toggleAudio()" class="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-xs font-mono flex items-center gap-2 transition-all">
+          <span id="soundIndicator" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span id="soundLabel">Audio Alerts: ON</span>
+        </button>
+        <div class="text-right hidden md:block">
+          <div class="text-xs font-mono text-emerald-400 font-semibold flex items-center justify-end gap-1.5">
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            NETWORK SYNCHRONIZED
+          </div>
+          <div id="liveClock" class="text-[11px] font-mono text-slate-400">10:20:27 AM IST</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="bg-[#0b101c] border-b border-slate-800/80 px-4 py-2.5 text-xs font-mono">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-slate-300">
+      <div class="flex items-center gap-6 overflow-x-auto custom-scrollbar pb-1 sm:pb-0">
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400">Active Emergencies:</span>
+          <span id="statActive" class="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold border border-rose-500/30">04</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400">ICU Beds Available:</span>
+          <span id="statIcu" class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">11</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400">Ambulances Dispatched:</span>
+          <span id="statAmbulance" class="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-bold border border-cyan-500/30">07</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400">Blood Critical Alert:</span>
+          <span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30 flex items-center gap-1">
+            <svg class="w-3 h-3 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 2.518 4.28a1 1 0 01-.864 1.509H2.132a1 1 0 01-.864-1.509l2.518-4.28-1.233-.617a1 1 0 01.894-1.789l1.599.799L9 4.323V3a1 1 0 011-1z"/></svg>
+            O- Low (4 units left in grid)
+          </span>
+        </div>
+      </div>
+      <div class="text-[11px] text-slate-400">
+        Matching Logic: <span class="text-cyan-400 font-bold">Suitability > Distance</span>
+      </div>
+    </div>
+  </section>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+    <nav class="flex border-b border-slate-800 gap-2 overflow-x-auto pb-2" aria-label="Tabs">
+      <button onclick="switchTab('dispatch')" id="tabBtn-dispatch" class="tab-btn px-4 py-2 text-sm font-semibold rounded-t-lg bg-slate-800 text-white border-b-2 border-rose-500 flex items-center gap-2 transition-all">
+        <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        1. Dispatch & AI Triage
+      </button>
+      <button onclick="switchTab('matching')" id="tabBtn-matching" class="tab-btn px-4 py-2 text-sm font-semibold rounded-t-lg text-slate-400 hover:text-slate-200 border-b-2 border-transparent flex items-center gap-2 transition-all">
+        <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        2. Hospital Matching Engine (USP)
+      </button>
+      <button onclick="switchTab('map')" id="tabBtn-map" class="tab-btn px-4 py-2 text-sm font-semibold rounded-t-lg text-slate-400 hover:text-slate-200 border-b-2 border-transparent flex items-center gap-2 transition-all">
+        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+        3. Live Simulation Map & En Route
+      </button>
+      <button onclick="switchTab('hospital-er')" id="tabBtn-hospital-er" class="tab-btn px-4 py-2 text-sm font-semibold rounded-t-lg text-slate-400 hover:text-slate-200 border-b-2 border-transparent flex items-center gap-2 transition-all">
+        <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+        4. Hospital ER Pre-Arrival Alert
+        <span id="erBadge" class="hidden h-2 w-2 rounded-full bg-rose-500 animate-ping"></span>
+      </button>
+      <button onclick="switchTab('control')" id="tabBtn-control" class="tab-btn px-4 py-2 text-sm font-semibold rounded-t-lg text-slate-400 hover:text-slate-200 border-b-2 border-transparent flex items-center gap-2 transition-all">
+        <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+        5. Central Command & Audit
+      </button>
+    </nav>
+
+    <section id="tab-dispatch" class="tab-content grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- Left Column: Input Form -->
+      <div class="lg:col-span-7 bg-[#101726] border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
+              Create Emergency Request
+            </h2>
+            <p class="text-xs text-slate-400">Dispatch operator triage & field intake portal</p>
+          </div>
+          <span class="px-2.5 py-1 text-xs font-mono rounded bg-slate-800 text-slate-300 border border-slate-700">Case ID: #EM-104</span>
+        </div>
+
+        <!-- AI Natural Language Prompt Box -->
+        <div class="mb-6 p-4 rounded-xl bg-slate-900/90 border border-cyan-500/30 relative">
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-semibold text-cyan-400 flex items-center gap-1.5 uppercase tracking-wider">
+              <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              AI Triage Assistant (Simulated NLP)
+            </label>
+            <span class="text-[10px] text-slate-400">Extracts medical needs from caller audio</span>
+          </div>
+          <textarea id="aiPromptInput" rows="2" class="w-full text-xs font-mono bg-slate-950/80 border border-slate-700 rounded-lg p-2.5 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500" placeholder="E.g., 'Major bike crash near Dharampeth square. Deep skull injury, bleeding severely, non-responsive, pulse 135.'"></textarea>
+          <div class="flex justify-between items-center mt-2.5">
+            <span class="text-[11px] text-slate-400">Clicking parse auto-fills required specialists, ICU, and severity.</span>
+            <button onclick="simulateAITriage()" class="px-3 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+              Parse with AI
+            </button>
+          </div>
+        </div>
+
+        <!-- Form Elements -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Patient Name / Identifier</label>
+            <input type="text" id="patientName" value="Rahul Verma (Male, 28y)" class="w-full text-xs bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:border-rose-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Emergency Category</label>
+            <select id="emergencyType" class="w-full text-xs bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:border-rose-500 focus:outline-none">
+              <option value="Road Accident">Road Traffic Accident (Polytrauma)</option>
+              <option value="Acute Cardiac">Acute Coronary Syndrome (Heart Attack)</option>
+              <option value="Severe Stroke">Ischemic/Hemorrhagic Stroke</option>
+              <option value="Severe Burns">Burn Injury (>30%)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Incident Location (Nagpur Sub-district)</label>
+            <select id="patientLocation" onchange="updateLocationCoordinates()" class="w-full text-xs bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:border-rose-500 focus:outline-none">
+              <option value="dharampeth">Dharampeth (West Nagpur) [21.1458, 79.0682]</option>
+              <option value="sitabuldi">Sitabuldi Interchange [21.1466, 79.0888]</option>
+              <option value="wardha_rd">Wardha Road IT Park [21.1012, 79.0555]</option>
+              <option value="kamal_sq">Kamal Chowk (North) [21.1712, 79.1022]</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Clinical Severity Level</label>
+            <select id="severityLevel" class="w-full text-xs bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:border-rose-500 focus:outline-none">
+              <option value="CRITICAL" class="text-rose-400 font-bold">🔴 CRITICAL (Immediate Life Threat)</option>
+              <option value="HIGH" class="text-amber-400">🟠 HIGH (Unstable / Deteriorating)</option>
+              <option value="MODERATE" class="text-emerald-400">🟡 MODERATE (Stable, Needs Care)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Blood Group Needed</label>
+            <div class="flex gap-2">
+              <select id="bloodGroup" class="w-2/3 text-xs bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:border-rose-500">
+                <option value="O-">O Negative (Universal)</option>
+                <option value="O+">O Positive</option>
+                <option value="A-">A Negative</option>
+                <option value="A+">A Positive</option>
+                <option value="B+">B Positive</option>
+                <option value="AB+">AB Positive</option>
+              </select>
+              <input type="number" id="bloodUnits" value="2" min="0" max="6" class="w-1/3 text-xs bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-center text-white" placeholder="Units">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Specialist Mandatory?</label>
+            <select id="requiredSpecialist" class="w-full text-xs bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:border-rose-500">
+              <option value="Neurosurgeon">Neurosurgeon (On-Duty)</option>
+              <option value="Interventional Cardiologist">Interventional Cardiologist</option>
+              <option value="Orthopedic Trauma Surgeon">Orthopedic Trauma Surgeon</option>
+              <option value="Burn Specialist">Plastic/Burn Surgeon</option>
+              <option value="None">None (General ER Physician)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-4 flex items-center justify-between bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+          <div class="flex items-center gap-3">
+            <input type="checkbox" id="reqIcu" checked class="w-4 h-4 text-rose-600 rounded bg-slate-800 border-slate-700 focus:ring-rose-500">
+            <div>
+              <span class="text-xs font-semibold text-slate-200 block">Require Immediate ICU Bed Reservation</span>
+              <span class="text-[11px] text-slate-400">Strict filter: Hospitals with 0 free ICUs get eliminated</span>
+            </div>
+          </div>
+          <span class="text-xs font-mono font-bold text-rose-400 bg-rose-500/10 px-2 py-1 rounded">HARD FILTER</span>
+        </div>
+
+        <!-- Action Button to Trigger Matching Engine -->
+        <div class="mt-6 flex gap-3">
+          <button onclick="executeHospitalMatch()" class="flex-1 py-3 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-rose-900/30 flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            Compute Smart Hospital Match
+          </button>
+          <button onclick="resetEmergencyForm()" class="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all">
+            Reset
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Column: Case Summary & Live Dispatch Preview -->
+      <div class="lg:col-span-5 flex flex-col gap-5">
+        <!-- Live Case Card -->
+        <div class="bg-[#101726] border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+              <span class="text-xs font-mono uppercase tracking-widest text-slate-400">Active Case Manifest</span>
+              <span id="caseSeverityBadge" class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40">CRITICAL</span>
+            </div>
+            
+            <div class="space-y-3 font-mono text-xs">
+              <div class="flex justify-between py-1 border-b border-slate-800/60">
+                <span class="text-slate-400">Patient:</span>
+                <span id="manifestPatient" class="text-white font-semibold">Rahul Verma (28y)</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-slate-800/60">
+                <span class="text-slate-400">Condition:</span>
+                <span id="manifestCondition" class="text-rose-400 font-bold">Head Injury (Extensive Trauma)</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-slate-800/60">
+                <span class="text-slate-400">Mandatory Specialist:</span>
+                <span id="manifestSpecialist" class="text-cyan-400 font-semibold">Neurosurgeon</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-slate-800/60">
+                <span class="text-slate-400">ICU Requirement:</span>
+                <span id="manifestICU" class="text-amber-400 font-bold">YES (Ventilator Capable)</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-slate-800/60">
+                <span class="text-slate-400">Blood Requested:</span>
+                <span id="manifestBlood" class="text-rose-400 font-bold">O- (2 Units)</span>
+              </div>
+              <div class="flex justify-between py-1">
+                <span class="text-slate-400">GPS Origin:</span>
+                <span id="manifestCoords" class="text-slate-300">21.1458° N, 79.0682° E</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-400 flex items-start gap-2.5">
+            <svg class="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div>
+              <strong class="text-slate-200">System USP Rule:</strong> Nearest hospital will be automatically bypassed if required surgical specialist or ICU capacity is unavailable.
+            </div>
+          </div>
+        </div>
+
+        <!-- Assigned Ambulance Status -->
+        <div class="bg-[#101726] border border-slate-800 rounded-2xl p-4 shadow-xl">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Dispatched Unit: #AMB-104</h3>
+                <p class="text-[10px] text-slate-400">Advanced Life Support (ALS) Van</p>
+              </div>
+            </div>
+            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">STANDBY</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-xs font-mono text-slate-300">
+            <div class="p-2 bg-slate-900 rounded-lg">
+              <span class="text-[10px] text-slate-400 block">Driver / Paramedic</span>
+              <span>Anand S. / Dr. Mehra</span>
+            </div>
+            <div class="p-2 bg-slate-900 rounded-lg">
+              <span class="text-[10px] text-slate-400 block">Base Station</span>
+              <span>Dharampeth Depot</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-matching" class="tab-content hidden flex-col gap-6">
+      <div class="bg-[#101726] border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div class="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-800 gap-4 mb-6">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/40">CORE USP</span>
+              <h2 class="text-lg font-bold text-white">Multi-Dimensional Resource Matching Algorithm</h2>
+            </div>
+            <p class="text-xs text-slate-400 mt-0.5">Evaluating medical compatibility, resource saturation, and transit decay vs. pure distance.</p>
+          </div>
+
+          <div class="flex items-center gap-2 text-xs font-mono bg-slate-900 p-2 rounded-xl border border-slate-800">
+            <span class="text-slate-400">Scoring Weight:</span>
+            <span class="text-rose-400">Resource 55%</span> |
+            <span class="text-cyan-400">ETA 30%</span> |
+            <span class="text-emerald-400">Capacity 15%</span>
+          </div>
+        </div>
+
+        <!-- Formula Callout Banner -->
+        <div class="mb-6 p-4 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-300 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+          <div>
+            <span class="text-cyan-400 font-bold">Suitability Score Equation:</span>
+            <span class="text-slate-200"> S = (W_res × R_match) + (W_cap × Cap_ratio) + (W_eta × (1 - ETA / ETA_max))</span>
+          </div>
+          <span class="text-[11px] text-rose-400 font-semibold bg-rose-500/10 px-2 py-1 rounded border border-rose-500/20">
+            *Hard filter drops any hospital with missing critical requirements
+          </span>
+        </div>
+
+        <!-- Live Hospital Comparison Cards Grid -->
+        <div id="hospitalMatchCards" class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <!-- Injected via JavaScript -->
+        </div>
+
+        <!-- Explanation Drawer for Judges -->
+        <div class="mt-6 p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+          <h4 class="text-xs font-bold text-white uppercase tracking-wider mb-2 font-mono flex items-center gap-2">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            Why did this match occur? (System Audit Log)
+          </h4>
+          <p id="algorithmExplanation" class="text-xs text-slate-300 leading-relaxed font-sans">
+            Please run the match to calculate real-time compatibility for the active emergency.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-map" class="tab-content hidden flex-col gap-6">
+      <div class="bg-[#101726] border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3 mb-4">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Live Geolocation & Fleet Telemetry (Nagpur Metro)
+            </h2>
+            <p class="text-xs text-slate-400">Real-time simulation of patient coordinate, ambulance transit, and hospital node reception</p>
+          </div>
+
+          <!-- Controls for simulation -->
+          <div class="flex items-center gap-2">
+            <button onclick="startAmbulanceSimulation()" id="startSimBtn" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/></svg>
+              Start Ambulance Transit Run
+            </button>
+            <button onclick="resetSimulation()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition-all">
+              Reset Path
+            </button>
+          </div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div class="relative w-full h-[460px] bg-[#070b13] rounded-xl border border-slate-800 overflow-hidden map-grid">
+          <!-- Canvas Overlay for Roads and Moving Ambulance -->
+          <canvas id="mapCanvas" class="w-full h-full block"></canvas>
+
+          <!-- Top-Left Legend HUD -->
+          <div class="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md border border-slate-800 p-3 rounded-xl text-[11px] font-mono space-y-1.5 shadow-lg">
+            <div class="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Map Legend</div>
+            <div class="flex items-center gap-2 text-rose-400"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Accident Site (Rahul V.)</div>
+            <div class="flex items-center gap-2 text-cyan-400"><span class="w-2.5 h-2.5 rounded-full bg-cyan-500"></span> Ambulance #104 (ALS)</div>
+            <div class="flex items-center gap-2 text-emerald-400"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Target Hospital (Selected)</div>
+            <div class="flex items-center gap-2 text-slate-400"><span class="w-2.5 h-2.5 rounded-full bg-slate-600"></span> Other Area Hospitals</div>
+          </div>
+
+          <!-- Bottom Floating Telemetry -->
+          <div class="absolute bottom-4 right-4 bg-slate-900/90 backdrop-blur-md border border-slate-800 p-3 rounded-xl text-xs font-mono shadow-lg flex items-center gap-4">
+            <div>
+              <span class="text-[10px] text-slate-400 block">Current Status</span>
+              <span id="mapAmbulanceStatus" class="text-amber-400 font-bold">READY AT BASE</span>
+            </div>
+            <div class="h-6 w-px bg-slate-700"></div>
+            <div>
+              <span class="text-[10px] text-slate-400 block">Transit ETA</span>
+              <span id="mapAmbulanceEta" class="text-white font-bold">-- min</span>
+            </div>
+            <div class="h-6 w-px bg-slate-700"></div>
+            <div>
+              <span class="text-[10px] text-slate-400 block">Distance Remaining</span>
+              <span id="mapAmbulanceDist" class="text-cyan-400 font-bold">-- km</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-hospital-er" class="tab-content hidden flex-col gap-6">
+      <div class="bg-[#101726] border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-4 mb-6">
+          <div class="flex items-center gap-3">
+            <div class="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 class="text-lg font-bold text-white">Apex Super Specialty Hospital (Nagpur)</h2>
+                <span class="text-xs font-mono font-bold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">ER ACCEPTING</span>
+              </div>
+              <p class="text-xs text-slate-400">Emergency Department Triage & Inbound Resource Allocation Interface</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button onclick="triggerSimulatedIncomingAlert()" class="px-3 py-1.5 bg-rose-600/90 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 font-mono shadow-md">
+              <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+              Simulate Inbound Siren
+            </button>
+          </div>
+        </div>
+
+        <!-- Inbound Emergency Notice Card -->
+        <div id="incomingEmergencyBox" class="rounded-2xl p-6 border-2 border-rose-500/60 bg-gradient-to-r from-rose-950/40 via-slate-900 to-slate-900 glow-red mb-6 relative overflow-hidden">
+          <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+            <div class="space-y-3">
+              <div class="flex items-center gap-2.5">
+                <span class="px-2.5 py-1 rounded bg-rose-600 text-white font-mono text-xs font-bold uppercase animate-pulse">
+                  CRITICAL PRE-ARRIVAL ALERT
+                </span>
+                <span class="text-xs font-mono text-slate-400">Case ID: #EM-104</span>
+                <span class="text-xs font-mono text-slate-400">• Dispatched ALS Amb #104</span>
+              </div>
+
+              <h3 class="text-xl font-bold text-white">
+                Rahul Verma (Male, 28) - Severe Head Trauma
+              </h3>
+
+              <div class="flex flex-wrap gap-2 text-xs font-mono">
+                <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-cyan-300 border border-slate-700">ICU Bed #03 Reserved</span>
+                <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-rose-300 border border-slate-700">Blood O- Units: 2 Reserved</span>
+                <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-amber-300 border border-slate-700">Neurosurgeon: Dr. A. Kulkarni Paged</span>
+              </div>
+            </div>
+
+            <!-- Countdown Timer & Actions -->
+            <div class="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto justify-end">
+              <div class="text-center p-3 rounded-xl bg-slate-950/90 border border-slate-800 min-w-[130px]">
+                <span class="text-[10px] text-slate-400 uppercase font-mono block">Estimated Arrival</span>
+                <span id="erArrivalTimer" class="text-2xl font-mono font-extrabold text-amber-400">08:42</span>
+                <span class="text-[10px] text-slate-400 font-mono block">Minutes : Seconds</span>
+              </div>
+
+              <div class="flex flex-col gap-2 w-full sm:w-auto">
+                <button id="acceptErBtn" onclick="respondToEmergency(true)" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                  CONFIRM & ACCEPT CASE
+                </button>
+                <button id="rejectErBtn" onclick="respondToEmergency(false)" class="px-6 py-2 bg-rose-950/60 hover:bg-rose-900/80 border border-rose-800 text-rose-300 font-medium rounded-xl text-xs flex items-center justify-center gap-2 transition-all">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  REJECT (No Capacity)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div id="erResponseBanner" class="hidden mt-4 p-3 rounded-lg bg-emerald-950/70 border border-emerald-500/50 text-emerald-300 text-xs font-mono flex items-center gap-2">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Case Confirmed! Trauma Team & OR-2 locked for Rahul Verma. Ambulance telemetry connected.
+          </div>
+        </div>
+
+        <!-- Hospital Live Department Capacity Grid -->
+        <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-3 font-mono">Hospital Internal Resource Status</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs text-slate-400 block mb-1">ICU Ventilator Beds</span>
+            <div class="flex items-baseline gap-2">
+              <span class="text-2xl font-bold font-mono text-emerald-400">3</span>
+              <span class="text-xs text-slate-500">/ 12 total</span>
+            </div>
+            <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+              <div class="bg-emerald-500 h-full w-3/4"></div>
+            </div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs text-slate-400 block mb-1">Emergency Trauma Beds</span>
+            <div class="flex items-baseline gap-2">
+              <span class="text-2xl font-bold font-mono text-cyan-400">8</span>
+              <span class="text-xs text-slate-500">/ 20 total</span>
+            </div>
+            <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+              <div class="bg-cyan-500 h-full w-2/5"></div>
+            </div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs text-slate-400 block mb-1">Blood Bank (O- Negative)</span>
+            <div class="flex items-baseline gap-2">
+              <span class="text-2xl font-bold font-mono text-rose-400">4 Units</span>
+              <span class="text-xs text-amber-400">⚠️ Low buffer</span>
+            </div>
+            <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+              <div class="bg-rose-500 h-full w-1/4"></div>
+            </div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs text-slate-400 block mb-1">On-Duty Neurosurgeon</span>
+            <div class="flex items-center gap-1.5 mt-1">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+              <span class="text-sm font-semibold text-white">Dr. A. Kulkarni</span>
+            </div>
+            <span class="text-[10px] text-slate-400 font-mono">Present in OT complex</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-control" class="tab-content hidden flex-col gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Main Table: Active Cases in Region -->
+        <div class="lg:col-span-8 bg-[#101726] border border-slate-800 rounded-2xl p-6 shadow-xl">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+            <div>
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                Active Regional Emergency Registry
+              </h2>
+              <p class="text-xs text-slate-400">Real-time status of all dispatched trauma units in Nagpur Metro</p>
+            </div>
+            <span class="text-xs font-mono text-cyan-400 bg-cyan-950/50 border border-cyan-800 px-2 py-1 rounded">Auto-refresh: 2s</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left font-mono text-xs text-slate-300">
+              <thead class="text-[11px] text-slate-400 uppercase bg-slate-900/80 border-b border-slate-800">
+                <tr>
+                  <th class="py-3 px-3">Case ID</th>
+                  <th class="py-3 px-3">Severity</th>
+                  <th class="py-3 px-3">Required Assets</th>
+                  <th class="py-3 px-3">Matched Hospital</th>
+                  <th class="py-3 px-3">ETA</th>
+                  <th class="py-3 px-3">Status</th>
+                </tr>
+              </thead>
+              <tbody id="controlRegistryBody" class="divide-y divide-slate-800/60">
+                <!-- Row 1 -->
+                <tr class="hover:bg-slate-900/40">
+                  <td class="py-3 px-3 font-bold text-white">#EM-104</td>
+                  <td class="py-3 px-3"><span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold">CRITICAL</span></td>
+                  <td class="py-3 px-3 text-slate-300">ICU + Neuro + O-</td>
+                  <td class="py-3 px-3 text-cyan-400 font-semibold">Apex Super Specialty</td>
+                  <td class="py-3 px-3 font-bold text-amber-400">09 min</td>
+                  <td class="py-3 px-3"><span class="text-emerald-400 flex items-center gap-1 font-semibold"><span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> En Route</span></td>
+                </tr>
+                <!-- Row 2 -->
+                <tr class="hover:bg-slate-900/40">
+                  <td class="py-3 px-3 font-bold text-white">#EM-103</td>
+                  <td class="py-3 px-3"><span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold">HIGH</span></td>
+                  <td class="py-3 px-3 text-slate-300">Cath Lab + ICU</td>
+                  <td class="py-3 px-3 text-cyan-400 font-semibold">Care City Clinic</td>
+                  <td class="py-3 px-3 font-bold text-slate-400">04 min</td>
+                  <td class="py-3 px-3"><span class="text-cyan-400 font-semibold">Accepted</span></td>
+                </tr>
+                <!-- Row 3 -->
+                <tr class="hover:bg-slate-900/40">
+                  <td class="py-3 px-3 font-bold text-white">#EM-102</td>
+                  <td class="py-3 px-3"><span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">MODERATE</span></td>
+                  <td class="py-3 px-3 text-slate-300">Orthopedic Surgeon</td>
+                  <td class="py-3 px-3 text-cyan-400 font-semibold">Metro Trauma Center</td>
+                  <td class="py-3 px-3 font-bold text-slate-400">00 min</td>
+                  <td class="py-3 px-3"><span class="text-indigo-400 font-semibold">Admitted / OT</span></td>
+                </tr>
+                <!-- Row 4 -->
+                <tr class="hover:bg-slate-900/40">
+                  <td class="py-3 px-3 font-bold text-white">#EM-101</td>
+                  <td class="py-3 px-3"><span class="px-2 py-0.5 rounded bg-slate-500/20 text-slate-400 font-bold">LOW</span></td>
+                  <td class="py-3 px-3 text-slate-300">General Dressing</td>
+                  <td class="py-3 px-3 text-cyan-400 font-semibold">Civil Hospital</td>
+                  <td class="py-3 px-3 font-bold text-slate-400">--</td>
+                  <td class="py-3 px-3"><span class="text-slate-400">Discharged</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Audit Timeline of Current Case -->
+        <div class="lg:col-span-4 bg-[#101726] border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 font-mono flex items-center gap-2">
+              <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              Case #EM-104 Life Cycle Audit
+            </h3>
+            
+            <div id="timelineContainer" class="space-y-4 relative border-l-2 border-slate-800 ml-3 pl-4 text-xs font-mono">
+              <div class="relative">
+                <span class="absolute -left-[23px] top-0.5 w-3 h-3 rounded-full bg-rose-500 border-2 border-[#101726]"></span>
+                <div class="font-bold text-slate-200">10:04:12 - Incident Logged</div>
+                <div class="text-[11px] text-slate-400">Road accident at Dharampeth. Severe trauma noted.</div>
+              </div>
+
+              <div class="relative">
+                <span class="absolute -left-[23px] top-0.5 w-3 h-3 rounded-full bg-cyan-500 border-2 border-[#101726]"></span>
+                <div class="font-bold text-slate-200">10:04:30 - Smart Matching Executed</div>
+                <div class="text-[11px] text-slate-400">Hospital A rejected (No ICU). Hospital C matched (98.4%).</div>
+              </div>
+
+              <div class="relative">
+                <span class="absolute -left-[23px] top-0.5 w-3 h-3 rounded-full bg-amber-500 border-2 border-[#101726]"></span>
+                <div class="font-bold text-slate-200">10:05:01 - Hospital C ER Alerted</div>
+                <div class="text-[11px] text-slate-400">Pre-arrival siren sent. ICU #3 reserved.</div>
+              </div>
+
+              <div id="timelineStepAccepted" class="relative">
+                <span class="absolute -left-[23px] top-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#101726]"></span>
+                <div class="font-bold text-slate-200">10:05:45 - Hospital Confirmed</div>
+                <div class="text-[11px] text-slate-400">Apex ER Dr. Kulkarni accepted incoming ALS #104.</div>
+              </div>
+
+              <div id="timelineStepEnRoute" class="relative">
+                <span class="absolute -left-[23px] top-0.5 w-3 h-3 rounded-full bg-blue-500 border-2 border-[#101726] animate-pulse"></span>
+                <div class="font-bold text-slate-200">10:06:10 - En Route (ETA 09 min)</div>
+                <div class="text-[11px] text-slate-400">Ambulance transit initiated via West High Court Rd.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 pt-4 border-t border-slate-800 text-[11px] font-mono text-slate-400">
+            System Compliance: <span class="text-emerald-400 font-semibold">NABH & Golden-Hour Certified Protocol</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-slate-800/80 bg-[#070b13] py-4 text-xs font-mono text-slate-400">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span>EmergencyLink MediRoute Protocol • Hackathon Prototype</span>
+      </div>
+      <div>
+        <span>Simulated Regional Dataset: Nagpur Metro (MH-31)</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Audio Context Setup (Safe Web Audio API Beeps for hospital siren simulation)
+    let audioCtx = null;
+    let isSoundEnabled = true;
+
+    function playBeep(freq = 880, duration = 0.15, type = 'sine') {
+      if (!isSoundEnabled) return;
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        console.warn('Audio play prevented', e);
+      }
+    }
+
+    function playPreArrivalSiren() {
+      if (!isSoundEnabled) return;
+      playBeep(700, 0.2, 'sawtooth');
+      setTimeout(() => playBeep(920, 0.25, 'sawtooth'), 220);
+    }
+
+    function toggleAudio() {
+      isSoundEnabled = !isSoundEnabled;
+      const indicator = document.getElementById('soundIndicator');
+      const label = document.getElementById('soundLabel');
+      if (isSoundEnabled) {
+        indicator.className = 'w-2 h-2 rounded-full bg-emerald-400';
+        label.innerText = 'Audio Alerts: ON';
+        playBeep(600, 0.1);
+      } else {
+        indicator.className = 'w-2 h-2 rounded-full bg-slate-600';
+        label.innerText = 'Audio Alerts: OFF';
+      }
+    }
+
+    // Active Nagpur Hospital Database (Realistic coords & capacity)
+    const hospitalNetwork = [
+      {
+        id: 'HOSP-A',
+        name: 'Care City Clinic (Nearest)',
+        locationName: 'Dharampeth West',
+        coords: { lat: 21.1480, lng: 79.0720 },
+        isAccepting: true,
+        icuBeds: 0, // ❌ Crucial constraint: 0 ICU beds
+        emergencyBeds: 4,
+        totalCapacity: 12,
+        specialists: ['General Physician', 'Orthopedic Trauma Surgeon'],
+        bloodStock: { 'O-': 1, 'A+': 5, 'B+': 4, 'O+': 6 },
+        distanceKm: 1.2,
+        fixedEtaMin: 4
+      },
+      {
+        id: 'HOSP-B',
+        name: 'Metro Trauma Center',
+        locationName: 'Sitabuldi Center',
+        coords: { lat: 21.1440, lng: 79.0870 },
+        isAccepting: true,
+        icuBeds: 3, // ✅ Has ICU
+        emergencyBeds: 6,
+        totalCapacity: 18,
+        specialists: ['Interventional Cardiologist', 'Orthopedic Trauma Surgeon'], // ❌ No Neurosurgeon
+        bloodStock: { 'O-': 2, 'A+': 4, 'B+': 7, 'O+': 8 },
+        distanceKm: 3.4,
+        fixedEtaMin: 7
+      },
+      {
+        id: 'HOSP-C',
+        name: 'Apex Super Specialty (Match Winner)',
+        locationName: 'Ramdaspeth Corridor',
+        coords: { lat: 21.1350, lng: 79.0800 },
+        isAccepting: true,
+        icuBeds: 3, // ✅ Has ICU
+        emergencyBeds: 8,
+        totalCapacity: 22,
+        specialists: ['Neurosurgeon', 'Interventional Cardiologist', 'Orthopedic Trauma Surgeon'], // ✅ Complete match
+        bloodStock: { 'O-': 4, 'A+': 9, 'B+': 10, 'O+': 12 }, // ✅ Adequate O-
+        distanceKm: 5.1,
+        fixedEtaMin: 9
+      }
+    ];
+
+    // Current State Container
+    let currentEmergencyState = {
+      patientName: 'Rahul Verma (Male, 28y)',
+      type: 'Road Accident',
+      severity: 'CRITICAL',
+      requiresICU: true,
+      requiredSpecialist: 'Neurosurgeon',
+      bloodGroup: 'O-',
+      bloodUnits: 2,
+      locationKey: 'dharampeth',
+      patientCoords: { lat: 21.1458, lng: 79.0682 },
+      selectedHospitalId: 'HOSP-C',
+      isAcceptedByER: false
+    };
+
+    // Haversine distance calculator
+    function calcDistance(coord1, coord2) {
+      const R = 6371; // Earth km
+      const dLat = (coord2.lat - coord1.lat) * Math.PI / 180;
+      const dLng = (coord2.lng - coord1.lng) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(coord1.lat * Math.PI / 180) * Math.cos(coord2.lat * Math.PI / 180) *
+                Math.sin(dLng/2) * Math.sin(dLng/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return parseFloat((R * c).toFixed(2));
+    }
+
+    function estimateEta(distanceKm) {
+      const avgSpeed = 32; // urban km/h
+      return Math.round((distanceKm / avgSpeed) * 60) + 2;
+    }
+
+    function computeHospitalRankings() {
+      const state = currentEmergencyState;
+      const rankings = [];
+
+      hospitalNetwork.forEach(hosp => {
+        const dist = calcDistance(state.patientCoords, hosp.coords);
+        const eta = estimateEta(dist);
+
+        // Verification checks
+        const hasICU = !state.requiresICU || hosp.icuBeds > 0;
+        const hasSpecialist = state.requiredSpecialist === 'None' || 
+          hosp.specialists.some(s => s.toLowerCase() === state.requiredSpecialist.toLowerCase());
+        const hasBlood = hosp.bloodStock[state.bloodGroup] >= state.bloodUnits;
+
+        let isDisqualified = false;
+        let disqualificationReason = '';
+
+        // Hard Filter: Critical cases MUST have ICU and Specialist
+        if (state.severity === 'CRITICAL') {
+          if (!hasICU) {
+            isDisqualified = true;
+            disqualificationReason = 'Eliminated: 0 ICU beds available for critical trauma';
+          } else if (!hasSpecialist) {
+            isDisqualified = true;
+            disqualificationReason = `Eliminated: Missing mandatory on-duty ${state.requiredSpecialist}`;
+          }
+        }
+
+        // Scoring Formula (0 to 100)
+        let resourceScore = 100;
+        if (!hasICU) resourceScore -= 40;
+        if (!hasSpecialist) resourceScore -= 35;
+        if (!hasBlood) resourceScore -= 25;
+        resourceScore = Math.max(0, resourceScore);
+
+        const capacityScore = Math.round((hosp.emergencyBeds / hosp.totalCapacity) * 100);
+        const maxEta = state.severity === 'CRITICAL' ? 30 : 50;
+        const etaScore = Math.max(0, Math.round((1 - eta / maxEta) * 100));
+
+        let finalScore = (resourceScore * 0.55) + (etaScore * 0.30) + (capacityScore * 0.15);
+        if (isDisqualified) {
+          finalScore = Math.min(finalScore, 24); // Cap eliminated hospitals low
+        }
+
+        rankings.push({
+          ...hosp,
+          distanceKm: dist,
+          etaMinutes: eta,
+          hasICU,
+          hasSpecialist,
+          hasBlood,
+          isDisqualified,
+          disqualificationReason,
+          scores: {
+            resourceScore,
+            capacityScore,
+            etaScore,
+            finalScore: parseFloat(finalScore.toFixed(1))
+          }
+        });
+      });
+
+      // Sort: Valid ones first by score, disqualified at bottom
+      rankings.sort((a, b) => {
+        if (a.isDisqualified && !b.isDisqualified) return 1;
+        if (!a.isDisqualified && b.isDisqualified) return -1;
+        return b.scores.finalScore - a.scores.finalScore;
+      });
+
+      return rankings;
+    }
+
+    function renderHospitalMatchingView() {
+      const rankings = computeHospitalRankings();
+      const container = document.getElementById('hospitalMatchCards');
+      if (!container) return;
+      container.innerHTML = '';
+
+      rankings.forEach((hosp, idx) => {
+        const isWinner = idx === 0 && !hosp.isDisqualified;
+        const card = document.createElement('div');
+        
+        let cardBorder = isWinner 
+          ? 'border-2 border-emerald-500 bg-gradient-to-b from-[#132328] to-[#101726] glow-emerald' 
+          : hosp.isDisqualified 
+            ? 'border border-rose-900/60 bg-[#12131e] opacity-80' 
+            : 'border border-slate-800 bg-[#101726]';
+
+        card.className = `rounded-2xl p-5 shadow-xl flex flex-col justify-between transition-all relative ${cardBorder}`;
+        
+        card.innerHTML = `
+          <div>
+            ${isWinner ? `
+              <div class="absolute -top-3 right-4 px-2.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-bold font-mono text-[10px] tracking-wider uppercase shadow-md flex items-center gap-1">
+                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                Optimal Match (Selected)
+              </div>
+            ` : ''}
+
+            <div class="flex justify-between items-start mb-3">
+              <div>
+                <h3 class="text-base font-bold text-white">${hosp.name}</h3>
+                <span class="text-xs text-slate-400 font-mono">${hosp.locationName}</span>
+              </div>
+              <div class="text-right">
+                <div class="text-2xl font-black font-mono ${isWinner ? 'text-emerald-400' : hosp.isDisqualified ? 'text-rose-400 line-through' : 'text-slate-300'}">
+                  ${hosp.scores.finalScore}
+                </div>
+                <span class="text-[10px] font-mono text-slate-400 uppercase">Match Score</span>
+              </div>
+            </div>
+
+            <!-- Hard Constraint Status Pills -->
+            <div class="space-y-2 py-3 border-y border-slate-800 text-xs font-mono">
+              <div class="flex justify-between items-center">
+                <span class="text-slate-400">ICU Bed Availability:</span>
+                <span class="font-bold ${hosp.icuBeds > 0 ? 'text-emerald-400' : 'text-rose-400 flex items-center gap-1'}">
+                  ${hosp.icuBeds > 0 ? `✅ ${hosp.icuBeds} Free` : '❌ 0 Free (None)'}
+                </span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-slate-400">Specialist (${currentEmergencyState.requiredSpecialist}):</span>
+                <span class="font-bold ${hosp.hasSpecialist ? 'text-emerald-400' : 'text-rose-400'}">
+                  ${hosp.hasSpecialist ? '✅ On-Duty' : '❌ Unavailable'}
+                </span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-slate-400">Blood (${currentEmergencyState.bloodGroup}):</span>
+                <span class="font-bold ${hosp.hasBlood ? 'text-emerald-400' : 'text-amber-400'}">
+                  ${hosp.bloodStock[currentEmergencyState.bloodGroup]} Units (${hosp.hasBlood ? 'Sufficient' : 'Low'})
+                </span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-slate-400">Transit Distance & ETA:</span>
+                <span class="font-bold text-slate-200">
+                  ${hosp.distanceKm} km (~${hosp.etaMinutes} min)
+                </span>
+              </div>
+            </div>
+
+            ${hosp.isDisqualified ? `
+              <div class="mt-3 p-2 rounded-lg bg-rose-950/70 border border-rose-800/80 text-[11px] font-mono text-rose-300 flex items-center gap-2">
+                <svg class="w-4 h-4 shrink-0 text-rose-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
+                ${hosp.disqualificationReason}
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
+            <span class="text-[11px] text-slate-400">Status: <strong class="${isWinner ? 'text-emerald-400' : 'text-slate-400'}">${isWinner ? 'Routed to Ambulance' : 'Secondary Backup'}</strong></span>
+            <button onclick="selectManualHospital('${hosp.id}')" class="px-3 py-1 text-xs font-mono font-semibold rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all">
+              ${isWinner ? 'Active Target' : 'Force Select'}
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      // Update Explanation Box
+      const explanation = document.getElementById('algorithmExplanation');
+      const winner = rankings[0];
+      if (winner && explanation) {
+        explanation.innerHTML = `
+          <strong>Result Analysis:</strong> Despite <em>Care City Clinic</em> being only 1.2 km away, it was disqualified due to <strong>0 available ICU beds</strong> for a critical head trauma case. 
+          <em>Metro Trauma Center</em> is closer (3.4 km) but lacked the mandatory on-duty <strong>${currentEmergencyState.requiredSpecialist}</strong>. 
+          Therefore, the engine routed the patient to <strong>${winner.name}</strong> (${winner.distanceKm} km, ~${winner.etaMinutes} min) which guarantees life-support readiness upon ambulance touchdown.
+        `;
+      }
+    }
+
+    function selectManualHospital(hospId) {
+      currentEmergencyState.selectedHospitalId = hospId;
+      playBeep(520, 0.15);
+      renderHospitalMatchingView();
+      switchTab('map');
+    }
+
+    function executeHospitalMatch() {
+      // Gather inputs
+      currentEmergencyState.patientName = document.getElementById('patientName').value;
+      currentEmergencyState.type = document.getElementById('emergencyType').value;
+      currentEmergencyState.severity = document.getElementById('severityLevel').value;
+      currentEmergencyState.requiresICU = document.getElementById('reqIcu').checked;
+      currentEmergencyState.requiredSpecialist = document.getElementById('requiredSpecialist').value;
+      currentEmergencyState.bloodGroup = document.getElementById('bloodGroup').value;
+      currentEmergencyState.bloodUnits = parseInt(document.getElementById('bloodUnits').value) || 2;
+
+      // Update Manifest
+      document.getElementById('manifestPatient').innerText = currentEmergencyState.patientName;
+      document.getElementById('manifestCondition').innerText = `${currentEmergencyState.type}`;
+      document.getElementById('manifestSpecialist').innerText = currentEmergencyState.requiredSpecialist;
+      document.getElementById('manifestICU').innerText = currentEmergencyState.requiresICU ? 'YES (Ventilator Required)' : 'Standard Bed';
+      document.getElementById('manifestBlood').innerText = `${currentEmergencyState.bloodGroup} (${currentEmergencyState.bloodUnits} Units)`;
+      
+      const sevBadge = document.getElementById('caseSeverityBadge');
+      sevBadge.innerText = currentEmergencyState.severity;
+      if (currentEmergencyState.severity === 'CRITICAL') {
+        sevBadge.className = 'text-xs font-mono font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40';
+      } else {
+        sevBadge.className = 'text-xs font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40';
+      }
+
+      playBeep(880, 0.2);
+      renderHospitalMatchingView();
+      switchTab('matching');
+    }
+
+    function simulateAITriage() {
+      const prompt = document.getElementById('aiPromptInput').value.trim();
+      playBeep(640, 0.1);
+
+      if (!prompt) {
+        document.getElementById('aiPromptInput').value = "Major bike accident, patient unconscious, heavy bleeding from head, erratic pulse.";
+      }
+
+      // Simulated NLP extraction logic
+      setTimeout(() => {
+        document.getElementById('emergencyType').value = 'Road Accident';
+        document.getElementById('severityLevel').value = 'CRITICAL';
+        document.getElementById('requiredSpecialist').value = 'Neurosurgeon';
+        document.getElementById('bloodGroup').value = 'O-';
+        document.getElementById('bloodUnits').value = 2;
+        document.getElementById('reqIcu').checked = true;
+
+        playBeep(980, 0.25);
+        const notice = document.createElement('div');
+        notice.className = 'fixed bottom-5 right-5 bg-cyan-900 border border-cyan-400 text-white px-4 py-3 rounded-xl shadow-2xl z-50 text-xs font-mono flex items-center gap-2';
+        notice.innerHTML = '<span>⚡</span> <span>AI extracted: CRITICAL Severity • Neurosurgeon Required • ICU Ventilator flagged.</span>';
+        document.body.appendChild(notice);
+        setTimeout(() => notice.remove(), 4000);
+      }, 300);
+    }
+
+    function updateLocationCoordinates() {
+      const locKey = document.getElementById('patientLocation').value;
+      currentEmergencyState.locationKey = locKey;
+      if (locKey === 'dharampeth') currentEmergencyState.patientCoords = { lat: 21.1458, lng: 79.0682 };
+      if (locKey === 'sitabuldi') currentEmergencyState.patientCoords = { lat: 21.1466, lng: 79.0888 };
+      if (locKey === 'wardha_rd') currentEmergencyState.patientCoords = { lat: 21.1012, lng: 79.0555 };
+      if (locKey === 'kamal_sq') currentEmergencyState.patientCoords = { lat: 21.1712, lng: 79.1022 };
+      document.getElementById('manifestCoords').innerText = `${currentEmergencyState.patientCoords.lat}° N, ${currentEmergencyState.patientCoords.lng}° E`;
+    }
+
+    function resetEmergencyForm() {
+      document.getElementById('patientName').value = 'Rahul Verma (Male, 28y)';
+      document.getElementById('emergencyType').value = 'Road Accident';
+      document.getElementById('severityLevel').value = 'CRITICAL';
+      document.getElementById('requiredSpecialist').value = 'Neurosurgeon';
+      document.getElementById('bloodGroup').value = 'O-';
+      document.getElementById('reqIcu').checked = true;
+      executeHospitalMatch();
+    }
+
+    // Preset shortcut handler
+    function loadPreset(type) {
+      if (type === 'neuro') {
+        document.getElementById('patientName').value = 'Vikas Rao (Male, 34y)';
+        document.getElementById('emergencyType').value = 'Road Accident';
+        document.getElementById('severityLevel').value = 'CRITICAL';
+        document.getElementById('requiredSpecialist').value = 'Neurosurgeon';
+        document.getElementById('bloodGroup').value = 'O-';
+        document.getElementById('reqIcu').checked = true;
+      } else if (type === 'cardiac') {
+        document.getElementById('patientName').value = 'Sunita Deshmukh (Female, 62y)';
+        document.getElementById('emergencyType').value = 'Acute Cardiac';
+        document.getElementById('severityLevel').value = 'CRITICAL';
+        document.getElementById('requiredSpecialist').value = 'Interventional Cardiologist';
+        document.getElementById('bloodGroup').value = 'A+';
+        document.getElementById('reqIcu').checked = true;
+      } else {
+        document.getElementById('patientName').value = 'Aman Joshi (Male, 19y)';
+        document.getElementById('emergencyType').value = 'Road Accident';
+        document.getElementById('severityLevel').value = 'MODERATE';
+        document.getElementById('requiredSpecialist').value = 'Orthopedic Trauma Surgeon';
+        document.getElementById('bloodGroup').value = 'B+';
+        document.getElementById('reqIcu').checked = false;
+      }
+      executeHospitalMatch();
+    }
+
+    let canvas, ctx;
+    let animId = null;
+    let simProgress = 0; // 0 to 1
+    let isSimulating = false;
+
+    function initMapCanvas() {
+      canvas = document.getElementById('mapCanvas');
+      if (!canvas) return;
+      ctx = canvas.getContext('2d');
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+      drawStaticMap();
+    }
+
+    function resizeCanvas() {
+      if (!canvas) return;
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+      drawStaticMap();
+    }
+
+    // Map Coordinates mapping to Canvas pixels
+    function toCanvasCoords(lat, lng) {
+      // Bounding box for Central Nagpur
+      const minLat = 21.09, maxLat = 21.19;
+      const minLng = 79.04, maxLng = 79.13;
+
+      const x = ((lng - minLng) / (maxLng - minLng)) * canvas.width;
+      const y = canvas.height - (((lat - minLat) / (maxLat - minLat)) * canvas.height);
+      return { x, y };
+    }
+
+    function drawStaticMap() {
+      if (!ctx || !canvas) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw Simulated Road Arterials
+      ctx.strokeStyle = 'rgba(71, 85, 105, 0.4)';
+      ctx.lineWidth = 3;
+      
+      const roads = [
+        [{lat: 21.18, lng: 79.05}, {lat: 21.11, lng: 79.12}],
+        [{lat: 21.12, lng: 79.05}, {lat: 21.16, lng: 79.12}],
+        [{lat: 21.145, lng: 79.05}, {lat: 21.145, lng: 79.12}]
+      ];
+
+      roads.forEach(road => {
+        ctx.beginPath();
+        const p1 = toCanvasCoords(road[0].lat, road[0].lng);
+        const p2 = toCanvasCoords(road[1].lat, road[1].lng);
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      });
+
+      // Target Hospital Node (Apex HOSP-C)
+      const targetHosp = hospitalNetwork.find(h => h.id === currentEmergencyState.selectedHospitalId) || hospitalNetwork[2];
+      const targetPt = toCanvasCoords(targetHosp.coords.lat, targetHosp.coords.lng);
+
+      // Patient Point
+      const patientPt = toCanvasCoords(currentEmergencyState.patientCoords.lat, currentEmergencyState.patientCoords.lng);
+
+      // Draw Hospitals
+      hospitalNetwork.forEach(hosp => {
+        const pt = toCanvasCoords(hosp.coords.lat, hosp.coords.lng);
+        const isSelected = hosp.id === targetHosp.id;
+
+        // Outer glow circle
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, isSelected ? 18 : 12, 0, Math.PI * 2);
+        ctx.fillStyle = isSelected ? 'rgba(16, 185, 129, 0.25)' : 'rgba(100, 116, 139, 0.15)';
+        ctx.fill();
+
+        // Hospital icon dot
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, isSelected ? 8 : 6, 0, Math.PI * 2);
+        ctx.fillStyle = isSelected ? '#10b981' : '#64748b';
+        ctx.fill();
+
+        // Hospital label
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.fillStyle = isSelected ? '#34d399' : '#94a3b8';
+        ctx.fillText(hosp.name.split(' (')[0], pt.x + 12, pt.y - 4);
+      });
+
+      // Draw Patient Crash Site
+      ctx.beginPath();
+      ctx.arc(patientPt.x, patientPt.y, 14, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(patientPt.x, patientPt.y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#ef4444';
+      ctx.fill();
+
+      ctx.font = 'bold 11px Inter, sans-serif';
+      ctx.fillStyle = '#f87171';
+      ctx.fillText('Accident: Rahul Verma', patientPt.x + 12, patientPt.y + 4);
+
+      // Transit Route connecting Patient to Chosen Hospital
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.moveTo(patientPt.x, patientPt.y);
+      ctx.lineTo(targetPt.x, targetPt.y);
+      ctx.strokeStyle = '#06b6d4';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw Moving Ambulance if simulation active or parked
+      const currentAmbX = patientPt.x + (targetPt.x - patientPt.x) * simProgress;
+      const currentAmbY = patientPt.y + (targetPt.y - patientPt.y) * simProgress;
+
+      ctx.beginPath();
+      ctx.arc(currentAmbX, currentAmbY, 10, 0, Math.PI * 2);
+      ctx.fillStyle = '#06b6d4';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+
+      ctx.font = 'bold 10px monospace';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('AMB #104', currentAmbX - 22, currentAmbY - 14);
+    }
+
+    function startAmbulanceSimulation() {
+      if (isSimulating) return;
+      isSimulating = true;
+      simProgress = 0;
+      playBeep(440, 0.1);
+
+      document.getElementById('mapAmbulanceStatus').innerText = 'EN ROUTE TO APEX ER';
+      document.getElementById('mapAmbulanceStatus').className = 'text-cyan-400 font-bold animate-pulse';
+
+      function step() {
+        simProgress += 0.0035; // speed
+        if (simProgress >= 1) {
+          simProgress = 1;
+          isSimulating = false;
+          drawStaticMap();
+          document.getElementById('mapAmbulanceStatus').innerText = 'ARRIVED AT TRAUMA BAY';
+          document.getElementById('mapAmbulanceStatus').className = 'text-emerald-400 font-bold';
+          document.getElementById('mapAmbulanceEta').innerText = '00 min';
+          document.getElementById('mapAmbulanceDist').innerText = '0.0 km';
+          playBeep(880, 0.3);
+          return;
+        }
+
+        drawStaticMap();
+
+        const remainingKm = ((1 - simProgress) * 5.1).toFixed(1);
+        const remainingEta = Math.ceil((1 - simProgress) * 9);
+        document.getElementById('mapAmbulanceDist').innerText = `${remainingKm} km`;
+        document.getElementById('mapAmbulanceEta').innerText = `${remainingEta} min`;
+
+        animId = requestAnimationFrame(step);
+      }
+
+      animId = requestAnimationFrame(step);
+    }
+
+    function resetSimulation() {
+      if (animId) cancelAnimationFrame(animId);
+      isSimulating = false;
+      simProgress = 0;
+      drawStaticMap();
+      document.getElementById('mapAmbulanceStatus').innerText = 'READY AT BASE';
+      document.getElementById('mapAmbulanceStatus').className = 'text-amber-400 font-bold';
+      document.getElementById('mapAmbulanceDist').innerText = '5.1 km';
+      document.getElementById('mapAmbulanceEta').innerText = '09 min';
+    }
+
+    function triggerSimulatedIncomingAlert() {
+      playPreArrivalSiren();
+      const box = document.getElementById('incomingEmergencyBox');
+      box.classList.add('animate-pulse');
+      setTimeout(() => box.classList.remove('animate-pulse'), 2500);
+
+      // Show top badge
+      const erBadge = document.getElementById('erBadge');
+      if (erBadge) erBadge.classList.remove('hidden');
+    }
+
+    function respondToEmergency(accepted) {
+      const banner = document.getElementById('erResponseBanner');
+      const acceptBtn = document.getElementById('acceptErBtn');
+      const rejectBtn = document.getElementById('rejectErBtn');
+
+      if (accepted) {
+        currentEmergencyState.isAcceptedByER = true;
+        banner.className = 'mt-4 p-3 rounded-lg bg-emerald-950/70 border border-emerald-500/50 text-emerald-300 text-xs font-mono flex items-center gap-2 block';
+        banner.innerHTML = '✅ CASE ACCEPTED: Trauma Bay 1 & ICU Bed #03 confirmed for inbound Rahul Verma. Specialist en route.';
+        acceptBtn.disabled = true;
+        acceptBtn.classList.add('opacity-50');
+        playBeep(1046, 0.25);
+
+        // Update Timeline
+        const tAccepted = document.getElementById('timelineStepAccepted');
+        if (tAccepted) {
+          tAccepted.querySelector('.font-bold').innerText = `${new Date().toLocaleTimeString()} - Case Accepted by Hospital ER`;
+        }
+      } else {
+        currentEmergencyState.isAcceptedByER = false;
+        banner.className = 'mt-4 p-3 rounded-lg bg-rose-950/80 border border-rose-500/50 text-rose-300 text-xs font-mono flex items-center gap-2 block';
+        banner.innerHTML = '⚠️ HOSPITAL REJECTED CAPACITY: System auto-triggering secondary cascade to next suitable facility.';
+        playBeep(320, 0.35, 'sawtooth');
+      }
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(el => {
+        el.classList.remove('bg-slate-800', 'text-white', 'border-rose-500');
+        el.classList.add('text-slate-400', 'border-transparent');
+      });
+
+      const targetSection = document.getElementById(`tab-${tabId}`);
+      const targetBtn = document.getElementById(`tabBtn-${tabId}`);
+      if (targetSection) targetSection.classList.remove('hidden');
+      if (targetBtn) {
+        targetBtn.classList.add('bg-slate-800', 'text-white', 'border-rose-500');
+        targetBtn.classList.remove('text-slate-400', 'border-transparent');
+      }
+
+      if (tabId === 'map') {
+        setTimeout(initMapCanvas, 50);
+      }
+      if (tabId === 'hospital-er') {
+        const erBadge = document.getElementById('erBadge');
+        if (erBadge) erBadge.classList.add('hidden');
+      }
+    }
+
+    // Clock update ticker
+    function startClock() {
+      setInterval(() => {
+        const clock = document.getElementById('liveClock');
+        if (clock) {
+          const now = new Date();
+          clock.innerText = now.toLocaleTimeString() + ' IST';
+        }
+      }, 1000);
+    }
+
+    // Application Bootstrap
+    window.addEventListener('load', () => {
+      startClock();
+      renderHospitalMatchingView();
+      initMapCanvas();
+    });
+  </script>
+</body>
+</html>
